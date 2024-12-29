@@ -4,6 +4,12 @@ This is a nice mix between [Spoly](https://github.com/filipovskis/spoly) and [Me
 
 Thanks to [Filipovskis](https://github.com/filipovskis) and [garryspins/orion](https://github.com/garryspins) for the original work!
 
+## Why would I use this?
+
+I created this so I can draw anything I want without worrying about performance, and it also supports anti-aliasing. Basically, it compiles and stores your drawing as a PNG, which you can then render as a material. This means you can use an expensive drawing function and still have it run about 100% faster than a `draw.RoundedBox` call.
+
+It achieves the smooth look by first scaling your drawing up. Then, when loading it with `Material`, we specify `mips` and `smooth`. The `smooth` option essentially does what `render.PushFilter`(`Mag`/`Min`) does, while `mips` enables smaller versions (mipmaps) to be drawn cleanly. As a result, you get a nice, smooth appearance at a very low performance cost.
+
 ## Example
 
 ```lua
@@ -30,7 +36,6 @@ end)
 ```
 
 ![image](https://github.com/user-attachments/assets/3bb87cd7-ff80-4bec-b9ab-613b8b86ae0e)
-
 
 You can find more examples at:
 
