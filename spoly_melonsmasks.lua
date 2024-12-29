@@ -149,7 +149,7 @@ function spoly_melonsmasks.Render(data)
         local path = SPOLY_MELONSMASKS_DIR .. util.SHA256(id) .. ".png"
         file.Write(path, mat_content)
 
-        local mat = Material("data/" .. path, "mips")
+        local mat = Material("data/" .. path, "mips smooth")
         materials[id] = mat
     end
 
