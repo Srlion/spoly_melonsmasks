@@ -29,6 +29,9 @@ hook.Add("HUDPaint", "DrawCircleMaterial", function()
 end)
 ```
 
+![image](https://github.com/user-attachments/assets/3bb87cd7-ff80-4bec-b9ab-613b8b86ae0e)
+
+
 You can find more examples at:
 
 - [Spoly](https://github.com/filipovskis/spoly)
