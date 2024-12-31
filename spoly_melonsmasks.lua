@@ -27,7 +27,6 @@ SOFTWARE.
 --- Licensed under MIT
 ---
 
-local bit = bit
 local file = file
 local string = string
 local math = math
@@ -69,7 +68,7 @@ local materials = spoly_melonsmasks.materials
 local queue = spoly_melonsmasks.queue
 local queued = {}
 
-local DEFAULT_SIZE = 2048
+local RT_FLAGS = 256
 
 file.CreateDir(SPOLY_MELONSMASKS_DIR)
 
@@ -89,9 +88,22 @@ do
     end
 end
 
-local CURRENT_SOURCE_RT, CURRENT_SOURCE_MAT
-local CURRENT_DEST_RT
-local CURRENT_W, CURRENT_H
+local DEFAULT_SIZE
+local SOURCE_RT, DEST_RT, SOURCE_MAT
+local function update_RTs()
+    DEFAULT_SIZE = math.max(ScrW(), ScrH())
+    SOURCE_RT = GetRenderTargetEx(ADDON_NAME .. "SpolyMelonsMasks_Source" .. DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE, 0, MATERIAL_RT_DEPTH_SEPARATE, RT_FLAGS, 0, IMAGE_FORMAT_BGRA8888)
+    DEST_RT = GetRenderTargetEx(ADDON_NAME .. "SpolyMelonsMasks_Source" .. DEFAULT_SIZE, DEFAULT_SIZE, DEFAULT_SIZE, 0, MATERIAL_RT_DEPTH_SEPARATE, RT_FLAGS, 0, IMAGE_FORMAT_BGRA8888)
+    SOURCE_MAT = CreateMaterial(ADDON_NAME .. "SpolyMelonsMasks_Source" .. DEFAULT_SIZE, "UnlitGeneric", {
+        ["$basetexture"] = SOURCE_RT:GetName(),
+        ["$translucent"] = "1",
+        ["$vertexalpha"] = "1",
+        ["$vertexcolor"] = "1",
+        ["$alpha"] = "1",
+    })
+end
+update_RTs()
+hook.Add("OnScreenSizeChanged", ADDON_NAME .. "spoly_melonsmasks.UpdateRTs", update_RTs)
 
 function spoly_melonsmasks.Render(data)
     local id, funcDraw, w, h = data.id, data.funcDraw, data.w, data.h
@@ -99,47 +111,37 @@ function spoly_melonsmasks.Render(data)
 
     spoly_melonsmasks.status = STATUS_BUSY
 
-    CURRENT_W = w or DEFAULT_SIZE
-    CURRENT_H = h or DEFAULT_SIZE
+    w = math.min(w or DEFAULT_SIZE, DEFAULT_SIZE)
+    h = math.min(h or DEFAULT_SIZE, DEFAULT_SIZE)
 
-    CURRENT_SOURCE_RT = GetRenderTargetEx(ADDON_NAME .. "SpolyMelonsMasks_Source" .. id, CURRENT_W, CURRENT_H, 0, MATERIAL_RT_DEPTH_SEPARATE, bit.bor(16, 256), 0, IMAGE_FORMAT_BGRA8888)
-    CURRENT_DEST_RT = GetRenderTargetEx(ADDON_NAME .. "SpolyMelonsMasks_Dest" .. id, CURRENT_W, CURRENT_H, 0, MATERIAL_RT_DEPTH_SEPARATE, bit.bor(16, 256), 0, IMAGE_FORMAT_BGRA8888)
-    CURRENT_SOURCE_MAT = CreateMaterial(ADDON_NAME .. "SpolyMelonsMasks_Source" .. id, "UnlitGeneric", {
-        ["$basetexture"] = CURRENT_SOURCE_RT:GetName(),
-        ["$translucent"] = "1",
-        ["$vertexalpha"] = "1",
-        ["$vertexcolor"] = "1",
-        ["$alpha"] = "1",
-    })
-
-    render.PushRenderTarget(CURRENT_DEST_RT)
+    render.PushRenderTarget(DEST_RT)
         render.SetWriteDepthToDestAlpha(false)
         render.Clear(0, 0, 0, 0, true, true)
 
         cam.Start2D()
             surface.SetDrawColor(color_white)
             draw.NoTexture()
-            local success, kind = xpcall(funcDraw, spoly_melonsmasks.PrintError, CURRENT_W, CURRENT_H)
+            local success, kind = xpcall(funcDraw, spoly_melonsmasks.PrintError, w, h)
             kind = kind or spoly_melonsmasks.KIND_CUT
         cam.End2D()
     render.PopRenderTarget()
 
-    render.PushRenderTarget(CURRENT_DEST_RT)
+    render.PushRenderTarget(DEST_RT)
         cam.Start2D()
             render.OverrideBlend(true,
                 kind[1], kind[2], kind[3]
             )
             surface.SetDrawColor(255, 255, 255)
-            surface.SetMaterial(CURRENT_SOURCE_MAT)
-            surface.DrawTexturedRect(0, 0, CURRENT_W, CURRENT_H)
+            surface.SetMaterial(SOURCE_MAT)
+            surface.DrawTexturedRect(0, 0, DEFAULT_SIZE, DEFAULT_SIZE)
             render.OverrideBlend(false)
         cam.End2D()
 
         local mat_content = success and render.Capture({
             x = 0,
             y = 0,
-            w = CURRENT_W,
-            h = CURRENT_H,
+            w = w,
+            h = h,
             format = "png",
             alpha = true
         })
@@ -166,7 +168,7 @@ function spoly_melonsmasks.Source()
     cam.End2D()
     render.PopRenderTarget()
 
-    render.PushRenderTarget(CURRENT_SOURCE_RT)
+    render.PushRenderTarget(SOURCE_RT)
     render.Clear(0, 0, 0, 0, true, true)
     cam.Start2D()
 end
@@ -175,19 +177,22 @@ function spoly_melonsmasks.And(kind)
     cam.End2D()
     render.PopRenderTarget()
 
-    render.PushRenderTarget(CURRENT_DEST_RT)
+    render.PushRenderTarget(DEST_RT)
     cam.Start2D()
         render.OverrideBlend(true,
             kind[1], kind[2], kind[3]
         )
         surface.SetDrawColor(255, 255, 255)
-        surface.SetMaterial(CURRENT_SOURCE_MAT)
-        surface.DrawTexturedRect(0, 0, CURRENT_W, CURRENT_H)
+        surface.SetMaterial(SOURCE_MAT)
+        surface.DrawTexturedRect(0, 0, DEFAULT_SIZE, DEFAULT_SIZE)
         render.OverrideBlend(false)
         spoly_melonsmasks.Source()
 end
 
 function spoly_melonsmasks.Generate(id, funcDraw, w, h)
+    if materials[id] then return end
+    if queued[id] then return end
+
     if not isstring(id) then
         spoly_melonsmasks.PrintError("bad argument #1 to 'spoly_melonsmasks.Generate' (expected string, got %s)", type(id))
         return
@@ -197,9 +202,6 @@ function spoly_melonsmasks.Generate(id, funcDraw, w, h)
         spoly_melonsmasks.PrintError("bad argument #2 to 'spoly_melonsmasks.Generate' (expected function, got %s)", type(funcDraw))
         return
     end
-
-    if materials[id] then return end
-    if queued[id] then return end
 
     do
         local path = SPOLY_MELONSMASKS_DIR .. util.SHA256(id) .. ".png"
@@ -222,7 +224,7 @@ function spoly_melonsmasks.Generate(id, funcDraw, w, h)
 end
 
 do
-    local think_rate = 1 / 3
+    local think_rate = 1 / 2
     local next_think = 0
     hook.Add("Think", "spoly_melonsmasks.QueueController." .. ADDON_NAME, function()
         if (spoly_melonsmasks.status == STATUS_IDLE and queue[1] and next_think <= CurTime()) then
