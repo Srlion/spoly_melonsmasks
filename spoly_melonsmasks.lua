@@ -151,7 +151,7 @@ function spoly_melonsmasks.Render(data)
         local path = SPOLY_MELONSMASKS_DIR .. util.SHA256(id) .. ".png"
         file.Write(path, mat_content)
 
-        local mat = Material("data/" .. path, "mips smooth")
+        local mat = Material("data/" .. path, "mips smooth noclamp")
         materials[id] = mat
     end
 
@@ -206,7 +206,7 @@ function spoly_melonsmasks.Generate(id, funcDraw, w, h)
     do
         local path = SPOLY_MELONSMASKS_DIR .. util.SHA256(id) .. ".png"
         if file.Exists(path, "DATA") then
-            materials[id] = Material("data/" .. path, "mips smooth")
+            materials[id] = Material("data/" .. path, "mips smooth noclamp")
             if not materials[id]:IsError() then
                 return
             end
